@@ -1,245 +1,230 @@
 # paint
 
-A small, fast Bash CLI for printing **styled, colored text** — or acting as a **stdin filter** — with a simple token-based syntax.
+A small, dependency-light **Bash CLI** to print **styled** and **colored** text with readable tokens.
 
-`paint` is designed to be:
-
-- **Composable** in pipelines (`date | paint blue`)
-- **Safe** for command substitution (`var="$(paint green test)"`)
-- **Portable** (Bash; works in Termux, WSL, Linux, macOS)
-- **Predictable** (clean resets, no color bleeding, correct exit codes)
-
----
-
-## Features
-
-- **Foreground & background colors** with names and numeric aliases  
-  `black|0 red|1 green|2 yellow|3 blue|4 magenta|5 cyan|6 white|7`
-- **Bright colors**
-  - `bright <color>`
-  - numeric codes `8..15`
-- **Text styles**
-  - `bold dim italic underline blink reverse invis`
-- **Targets**
-  - `-fg|--foreground` (default)
-  - `-bg|--background`
-- **Color backend**
-  - `--ansi` (default)
-  - `--tput`
-- **Color policy**
-  - `--color always` (default)
-  - `--color auto`
-  - `--color never`
-  - `--force-color`, `--no-color`
-- **Pipeline-friendly**
-  - Reads stdin automatically
-  - Explicit stdin token `-`
-- **Join stdin + suffix**
-  - `--join newline|space|none`
-  - Smart newline behavior (no double newlines)
-- **Escape handling**
-  - TEXT args support `printf %b` escapes (`\n`, `\t`, etc.)
-  - `--escapes-stdin` for stdin
-- **Color table**
-  - `-t | --table`
-- **Zsh completion**
-  - `paint --completion zsh`
+- ANSI escape codes by default (optionally `tput`)
+- Token-based flags for styles + colors
+- Works with pipes (stdin in/out)
+- Optional **boxed** output (`--box`) with configurable border color (`--border`)
+- Built-in **zsh completion** generator (`paint --completion zsh`)
+- Built-in **tables** for tokens/colors (`paint -t`)
 
 ---
 
-## Installation
+## Install
 
-### Manual (recommended)
-
-```bash
+~~~bash
 # put paint somewhere on PATH
 install -m 755 paint ~/.local/bin/paint
 
 # or:
 chmod +x paint
 mv paint ~/.local/bin/
-```
-
-Ensure `~/.local/bin` is on your PATH:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Termux
-
-```bash
-chmod +x paint
-cp paint $PREFIX/bin/paint
-```
+~~~
 
 ---
 
 ## Usage
 
-### Basic colors
+~~~bash
+paint [options|tokens...] [--] [TEXT...]
+paint [options|tokens...] -        # explicit: read stdin as text
+<cmd> | paint [options|tokens...]  # filter stdin
+~~~
 
-```bash
+### Common examples
+
+~~~bash
 paint red "hello"
-paint blue "hello"
-paint 4 "blue via numeric"
-```
+paint underline green bold "hello"
+paint red -bg green "hello"
+paint bright yellow "warning!"
+~~~
 
-### Bright colors
+### Pipe / stdin examples
 
-```bash
-paint bright red "bright red"
-paint 9 "bright red via code"
-paint bright blue "bright blue"
-```
+Colorize the output of another command:
+
+~~~bash
+date | paint blue
+ls -la | paint bright cyan
+~~~
+
+Explicitly read stdin with `-` and join with a suffix:
+
+~~~bash
+echo "hello" | paint blue --join space - "world"
+echo "hello" | paint blue --join newline - "world"
+echo "hello" | paint blue --join none - "world"
+~~~
+
+Interpret escapes from stdin:
+
+~~~bash
+printf 'a\\nb\\n' | paint --escapes-stdin green
+~~~
+
+Interpret escapes from arguments (printf `%b` behavior):
+
+~~~bash
+paint blue "line1\nline2\n"
+~~~
+
+---
+
+## Tokens
 
 ### Styles
 
-```bash
-paint bold "bold text"
-paint underline green "underlined green"
-paint italic dim "muted italic"
-```
+These enable the matching text attribute:
 
-Order is flexible:
+- `bold`
+- `dim`
+- `italic`
+- `underline`
+- `blink`
+- `reverse`
+- `invis`
 
-```bash
+Order doesn’t matter:
+
+~~~bash
 paint underline green bold "text"
 paint green bold underline "text"
-```
+~~~
 
-### Background colors
+### Foreground / background target
 
-```bash
+- `-fg` / `--foreground` (default target)
+- `-bg` / `--background`
+
+Examples:
+
+~~~bash
+paint blue "fg blue"
+paint red -bg green "red fg + green bg"
 paint -bg blue white "white on blue"
-paint red -bg green "red with green background"
-```
+~~~
 
-Foreground is default:
+### Colors
 
-```bash
-paint blue "text"
-```
+Named colors and numeric aliases:
 
----
+| Name / Token | Code |
+|---|---:|
+| `black` | `0` |
+| `red` | `1` |
+| `green` | `2` |
+| `yellow` | `3` |
+| `blue` | `4` |
+| `magenta` | `5` |
+| `cyan` | `6` |
+| `white` | `7` |
 
-## Color backend
+Numeric also works:
 
-```bash
-paint --ansi green "ANSI mode (default)"
-paint --tput green "tput / terminfo mode"
-```
+~~~bash
+paint 2 "green text"
+paint -bg 4 7 "white on blue"
+~~~
 
----
+### Bright colors
 
-## Color output control
+Use `bright <color>` or direct codes `8..15`:
 
-Default is `--color always` (still requires a color-capable terminal).
-
-```bash
-paint --color auto green "only colorize when stdout is a TTY"
-paint --color never green "never emit color"
-paint --force-color green
-paint --no-color green
-```
-
----
-
-## Stdin & pipelines
-
-### Filter stdin
-
-```bash
-date | paint cyan
-echo "hello" | paint green
-```
-
-### Explicit stdin token (`-`)
-
-```bash
-echo "hello" | paint yellow -
-```
-
-### Join stdin + suffix
-
-```bash
-echo "hello" | paint blue --join space - "world"
-# hello world
-
-echo "hello" | paint blue --join newline - "world"
-# hello
-# world
-```
-
-**Smart newline behavior:**  
-When using `--join newline`, if stdin already ends with `\n`, `paint` won’t add another.
+~~~bash
+paint bright red "bright red"
+paint 9 "bright red"
+paint -bg bright blue white "white on bright blue"
+~~~
 
 ---
 
-## Escapes
+## Options
 
-### Escapes in TEXT arguments
+### Color backend
 
-TEXT args are printed using `printf %b`:
+- `--ansi` (default)
+- `--tput`
 
-```bash
-paint green "line1\nline2\n"
-```
+### Color mode
 
-### Escapes from stdin
+Controls whether color escapes are emitted:
 
-By default, stdin is raw. Enable escape interpretation:
+- `--color always` (default)
+- `--color auto` (only when stdout is a TTY)
+- `--color never`
 
-```bash
-printf 'a\\nb\\n' | paint --escapes-stdin cyan
-```
+Convenience aliases:
+
+- `--force-color` → `--color always`
+- `--no-color` → `--color never`
 
 ---
 
-## Color table
+## Tables
 
-```bash
-paint --table
-# or
+Print formatted tables for style tokens + colors:
+
+~~~bash
 paint -t
-```
+paint --table
+~~~
 
-Displays all color names, codes, and FG/BG examples  
-(colors only shown if the terminal supports them).
+The tables use unicode box drawing characters when the locale is UTF-8.
 
 ---
 
-## Zsh completion
+## Box Mode
 
-Generate and install completion:
+Draw a box around the rendered output.
 
-```zsh
+Border color can be provided either:
+
+1) as the token immediately after `--box`, or  
+2) via `--border <color>`
+
+Examples:
+
+~~~bash
+# border is red; text is blue on black
+paint --box red -fg blue -bg black "text"
+
+# same, using --border
+paint --box --border red -fg blue -bg black "text"
+~~~
+
+Multi-line works:
+
+~~~bash
+paint --box --border bright cyan -fg white "line1\nline2\nline3"
+~~~
+
+> Note: Box borders are colored only when color output is enabled (`--color` mode allows it and the terminal supports color).
+
+---
+
+## Completion (zsh)
+
+Generate the completion script:
+
+~~~bash
+paint --completion zsh > _paint
+~~~
+
+Then put `_paint` somewhere in your `$fpath`, or source it.
+
+Example:
+
+~~~bash
 mkdir -p ~/.zsh/completions
 paint --completion zsh > ~/.zsh/completions/_paint
 fpath=(~/.zsh/completions $fpath)
 autoload -Uz compinit && compinit
-```
-
-Completion features:
-
-- Stops suggesting tokens after `--`
-- After `bright`, only suggests colors
-- Includes all flags and modes
+~~~
 
 ---
 
-## Exit codes
+## License
 
-- `0` — success
-- `1` — error (invalid args, stdin requested but not piped, etc.)
-
----
-
-## Philosophy
-
-`paint` favors:
-
-- explicit tokens over flags
-- streaming over buffering
-- clean resets (no ANSI bleeding)
-- predictable behavior in scripts
+MIT (or your preferred license — add one to the repo if needed).
